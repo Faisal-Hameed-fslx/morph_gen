@@ -37,8 +37,39 @@ def _shape_key_items(self, context):
         m = operators.get_target_mesh()
         if m and m.data.shape_keys:
             for kb in m.data.shape_keys.key_blocks:
+                if kb.name != 'Basis' and operators.is_combined_key(m, kb.name):
+                    items.append((kb.name, kb.name, ""))
+    except Exception:
+        pass
+    if not items:
+        items.append(('NONE', 'No shape keys', ''))
+    return items
+
+
+def _source_shape_key_items(self, context):
+    items = []
+    try:
+        from . import operators
+        m = operators.get_target_mesh()
+        if m and m.data.shape_keys:
+            for kb in m.data.shape_keys.key_blocks:
                 if kb.name != 'Basis':
                     items.append((kb.name, kb.name, ""))
+    except Exception:
+        pass
+    if not items:
+        items.append(('NONE', 'No shape keys', ''))
+    return items
+
+
+def _basis_key_items(self, context):
+    items = []
+    try:
+        from . import operators
+        m = operators.get_target_mesh()
+        if m and m.data.shape_keys:
+            for kb in m.data.shape_keys.key_blocks:
+                items.append((kb.name, kb.name, ""))
     except Exception:
         pass
     if not items:
@@ -118,6 +149,26 @@ class MorphGenSettings(bpy.types.PropertyGroup):
     new_shape_key_name: bpy.props.StringProperty(
         name="New Shape Key Name",
         default="NewMorph",
+    )
+    new_shape_key_name: bpy.props.StringProperty(
+        name="New Morph Name",
+        description="Name for the next key captured from the current mesh mix",
+        default="NewMorph",
+    )
+    combine_positive_key: bpy.props.EnumProperty(
+        name="Positive Key",
+        description="Shape key whose deformation is applied in the positive direction",
+        items=_source_shape_key_items,
+    )
+    combine_negative_key: bpy.props.EnumProperty(
+        name="Negative Key",
+        description="Shape key whose deformation is subtracted from the positive shape",
+        items=_source_shape_key_items,
+    )
+    combined_morph_name: bpy.props.StringProperty(
+        name="Combined Morph Name",
+        description="Name for the new morph, controlled from 0 Basis to 1 Deformed",
+        default="CombinedMorph",
     )
     shape_key_to_remove: bpy.props.EnumProperty(
         name="Shape Key",

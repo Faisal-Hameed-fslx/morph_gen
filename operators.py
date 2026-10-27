@@ -12,6 +12,41 @@ from bpy.props import StringProperty
 from . import properties
 
 
+def is_combined_key(obj, name):
+    try:
+        return name in json.loads(obj.get("morph_gen_combined_keys", "[]"))
+    except (TypeError, ValueError):
+        return False
+
+
+def _set_combined_key(obj, name):
+    names = []
+    try:
+        names = json.loads(obj.get("morph_gen_combined_keys", "[]"))
+    except (TypeError, ValueError):
+        pass
+    if name not in names:
+        names.append(name)
+    obj["morph_gen_combined_keys"] = json.dumps(sorted(names))
+
+
+def _combined_property_name(name):
+    return "morph_gen_combined_%s" % "".join(
+        char.lower() if char.isalnum() else "_" for char in name
+    ).strip("_")
+
+
+def _add_controller_driver(key, controller, property_name, expression):
+    key.driver_remove("value")
+    driver = key.driver_add("value").driver
+    variable = driver.variables.new()
+    variable.name = "controller"
+    variable.type = "SINGLE_PROP"
+    variable.targets[0].id = controller
+    variable.targets[0].data_path = '[\"%s\"]' % property_name
+    driver.expression = expression
+
+
 def _char_collection():
     scene = bpy.context.scene
     name = scene.morph_gen.loaded_collection
@@ -32,7 +67,14 @@ def _collect_collection_objects(coll):
 
 
 def get_char_objects():
-    return _collect_collection_objects(_char_collection())
+    try:
+        target = bpy.context.scene.morph_gen.target_object
+    except (AttributeError, RuntimeError):
+        target = None
+    if target is not None and target.type == 'MESH':
+        return [target]
+    collection_objects = _collect_collection_objects(_char_collection())
+    return collection_objects
 
 
 def get_meshes_with_shape_keys():
@@ -69,16 +111,17 @@ def get_armature():
 
 def _set_slider_ranges():
     for obj in get_meshes_with_shape_keys():
-        if obj.data.shape_keys is None:
+        _set_object_slider_ranges(obj)
+
+
+def _set_object_slider_ranges(obj):
+    if obj is None or obj.type != 'MESH' or obj.data.shape_keys is None:
+        return
+    for key in obj.data.shape_keys.key_blocks:
+        if key.name == 'Basis':
             continue
-        for kb in obj.data.shape_keys.key_blocks:
-            if kb.name == 'Basis':
-                continue
-            try:
-                kb.slider_min = -1.0
-                kb.slider_max = 1.0
-            except Exception:
-                pass
+        key.slider_min = 0.0
+        key.slider_max = 1.0
 
 
 def _sync_meshes_to_primary():
@@ -97,6 +140,14 @@ def _sync_meshes_to_primary():
             other = obj.data.shape_keys.key_blocks.get(kb.name)
             if other is not None and other.value != kb.value:
                 other.value = kb.value
+
+
+def _reset_shape_key_values(obj):
+    if obj is None or obj.data.shape_keys is None:
+        return
+    for key in obj.data.shape_keys.key_blocks:
+        if key.name != "Basis":
+            key.value = 0.0
 
 
 def _bake_face_match(name):
@@ -282,9 +333,11 @@ class MORPHGEN_OT_pick_model(bpy.types.Operator):
             self.report({'WARNING'}, "Select a mesh with shape keys in the 3D View")
             return {'CANCELLED'}
         context.scene.morph_gen.target_object = obj
-        collections = list(obj.users_collection)
-        if collections:
-            context.scene.morph_gen.loaded_collection = collections[0].name
+        _set_object_slider_ranges(obj)
+        context.scene.morph_gen.loaded_collection = ""
+        bpy.ops.object.select_all(action='DESELECT')
+        obj.select_set(True)
+        context.view_layer.objects.active = obj
         self.report({'INFO'}, "Using selected model: %s" % obj.name)
         return {'FINISHED'}
 
@@ -450,28 +503,114 @@ class MORPHGEN_OT_export(bpy.types.Operator, ExportHelper):
         return {'FINISHED'}
 class MORPHGEN_OT_add_shape_key(bpy.types.Operator):
     bl_idname = "morph_gen.add_shape_key"
-    bl_label = "Add Shape Key (from current)"
-    bl_description = "Create a new shape key from the current deformed mesh"
+    bl_label = "Create Morph Key"
+    bl_description = "Capture the current mix as a new key at influence 1"
 
     def execute(self, context):
         s = context.scene.morph_gen
         name = s.new_shape_key_name.strip() or "NewMorph"
         primary = get_target_mesh()
-        if primary is None or primary.data.shape_keys is None:
-            self.report({'WARNING'}, "No target mesh")
+        if primary is None:
+            self.report({'WARNING'}, "Select a target mesh first")
             return {'CANCELLED'}
-        if primary.data.shape_keys.key_blocks.get('Basis') is None:
-            primary.shape_key_add(name='Basis', from_mix=False)
+        if primary.data.shape_keys is None:
+            primary.shape_key_add(name="Basis", from_mix=False)
+        keys = primary.data.shape_keys.key_blocks
+        if keys.get("Basis") is None:
+            self.report({'ERROR'}, "Blender Basis key is missing")
+            return {'CANCELLED'}
+        if name == "Basis":
+            self.report({'WARNING'}, "Basis is reserved")
+            return {'CANCELLED'}
+        existing = primary.data.shape_keys.key_blocks.get(name)
+        if existing is not None:
+            primary.shape_key_remove(existing)
+        context.view_layer.update()
         new_key = primary.shape_key_add(name=name, from_mix=True)
-        new_key.value = 0.0
-        for obj in get_meshes_with_shape_keys():
-            if obj == primary or obj.data.shape_keys is None:
-                continue
-            other = obj.data.shape_keys.key_blocks.get(name)
-            if other is not None:
-                other.value = 0.0
-        _sync_meshes_to_primary()
-        self.report({'INFO'}, "Added shape key: %s" % name)
+        new_key.relative_key = keys.get("Basis")
+        new_key.slider_min = 0.0
+        new_key.slider_max = 1.0
+        new_key.value = 1.0
+        for key in primary.data.shape_keys.key_blocks:
+            if key.name not in {"Basis", name}:
+                key.value = 0.0
+        new_key.value = 1.0
+        primary.active_shape_key_index = list(
+            primary.data.shape_keys.key_blocks
+        ).index(new_key)
+        bpy.context.view_layer.objects.active = primary
+        primary.select_set(True)
+        context.view_layer.update()
+        self.report({'INFO'}, "Created %s at influence 1; deform it and create the next key" % name)
+        return {'FINISHED'}
+
+
+class MORPHGEN_OT_combine_shape_keys(bpy.types.Operator):
+    bl_idname = "morph_gen.combine_shape_keys"
+    bl_label = "Create Combined Morph"
+    bl_description = "Create a new 0-to-1 morph from selected positive and negative shape keys"
+
+    def execute(self, context):
+        s = context.scene.morph_gen
+        primary = get_target_mesh()
+        positive_name = s.combine_positive_key
+        negative_name = s.combine_negative_key
+        name = s.combined_morph_name.strip()
+        if primary is None or primary.data.shape_keys is None:
+            self.report({'WARNING'}, "Select a mesh with shape keys first")
+            return {'CANCELLED'}
+        if not name:
+            self.report({'WARNING'}, "Enter a name for the combined morph")
+            return {'CANCELLED'}
+        if positive_name in ('', 'NONE') or negative_name in ('', 'NONE'):
+            self.report({'WARNING'}, "Choose both a positive and negative shape key")
+            return {'CANCELLED'}
+        if positive_name == negative_name:
+            self.report({'WARNING'}, "Positive and negative keys must be different")
+            return {'CANCELLED'}
+        keys = primary.data.shape_keys.key_blocks
+        positive = keys.get(positive_name)
+        negative = keys.get(negative_name)
+        if keys.get("Basis") is None or positive is None or negative is None:
+            self.report({'WARNING'}, "The selected shape keys are no longer available")
+            return {'CANCELLED'}
+        if name == "Basis":
+            self.report({'WARNING'}, "Basis is reserved")
+            return {'CANCELLED'}
+        existing = keys.get(name)
+        if existing is not None:
+            primary.shape_key_remove(existing)
+        property_name = _combined_property_name(name)
+
+        primary[property_name] = 0.0
+        ui = primary.id_properties_ui(property_name)
+        ui.update(min=-1.0, max=1.0, soft_min=-1.0, soft_max=1.0)
+        _add_controller_driver(
+            positive,
+            primary,
+            property_name,
+            "max(controller, 0.0)",
+        )
+        _add_controller_driver(
+            negative,
+            primary,
+            property_name,
+            "max(-controller, 0.0)",
+        )
+        _set_combined_key(primary, name)
+        positive.slider_min = 0.0
+        positive.slider_max = 1.0
+        negative.slider_min = 0.0
+        negative.slider_max = 1.0
+        positive.value = 0.0
+        negative.value = 0.0
+        primary.update_tag()
+        context.view_layer.update()
+        context.view_layer.update()
+        self.report(
+            {'INFO'},
+            "Created %s: -1 Negative, 0 Basis, +1 Positive" % name,
+        )
         return {'FINISHED'}
 
 
@@ -750,4 +889,8 @@ def unregister():
     for cls in reversed(_classes):
         bpy.utils.unregister_class(cls)
 
-_classes = _classes + (MORPHGEN_OT_add_shape_key, MORPHGEN_OT_remove_shape_key)
+_classes = _classes + (
+    MORPHGEN_OT_add_shape_key,
+    MORPHGEN_OT_remove_shape_key,
+)
+_classes = _classes + (MORPHGEN_OT_combine_shape_keys,)

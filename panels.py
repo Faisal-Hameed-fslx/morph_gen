@@ -26,6 +26,13 @@ class MORPHGEN_PT_main(bpy.types.Panel):
         if primary is None or primary.data.shape_keys is None:
             model_box.label(text="Select a mesh with shape keys", icon='INFO')
             return
+        model_box.label(
+            text="%s | %d morphs" % (
+                primary.name,
+                max(0, len(primary.data.shape_keys.key_blocks) - 1),
+            ),
+            icon='CHECKMARK',
+        )
 
         actions = layout.box()
         actions.label(text="Shape Key Actions", icon='MODIFIER')
@@ -45,21 +52,22 @@ class MORPHGEN_PT_main(bpy.types.Panel):
         row.operator("morph_gen.load_preset", text="Load Preset", icon='IMPORT')
         presets.operator("morph_gen.export", text="Export FBX", icon='EXPORT')
 
-        version_box = layout.box()
-        version_box.label(text="Scene Checkpoints", icon='FILE_TICK')
-        version_box.prop(s, "version_name")
-        version_box.operator("morph_gen.save_version", icon='FILE_TICK')
-        version_box.prop(s, "saved_version")
-        row = version_box.row(align=True)
-        row.operator("morph_gen.restore_version", icon='LOOP_BACK')
-        row.operator("morph_gen.delete_version", icon='TRASH')
-
         layout.prop(s, "filter_text", icon='VIEWZOOM')
 
         sk_box = layout.box()
-        sk_box.label(text="Morph Library", icon='SHAPEKEY_DATA')
-        sk_box.prop(s, "new_shape_key_name")
-        sk_box.operator("morph_gen.add_shape_key", text="Create Morph From Current", icon='ADD')
+        sk_box.label(text="Combined Morph Library", icon='SHAPEKEY_DATA')
+        sk_box.label(text="Create source keys in Blender's Shape Keys panel", icon='INFO')
+        combine = sk_box.box()
+        combine.label(text="Combine Existing Morphs", icon='MODIFIER')
+        combine.label(text="Output: 0 Basis | 1 Combined Deformation", icon='INFO')
+        combine.prop(s, "combine_positive_key")
+        combine.prop(s, "combine_negative_key")
+        combine.prop(s, "combined_morph_name")
+        combine.operator(
+            "morph_gen.combine_shape_keys",
+            text="Create Named Combined Morph",
+            icon='ADD',
+        )
         sk_box.prop(s, "shape_key_to_remove")
         sk_box.operator("morph_gen.remove_shape_key", text="Remove Selected Morph", icon='REMOVE')
         sk = primary.data.shape_keys
@@ -67,7 +75,7 @@ class MORPHGEN_PT_main(bpy.types.Panel):
         groups = {}
         filt = s.filter_text.lower().strip()
         for kb in sk.key_blocks:
-            if kb.name == 'Basis':
+            if kb.name == 'Basis' or not operators.is_combined_key(primary, kb.name):
                 continue
             if filt and filt not in kb.name.lower():
                 continue
@@ -79,10 +87,41 @@ class MORPHGEN_PT_main(bpy.types.Panel):
             box.label(text=group)
             for name in sorted(groups[group]):
                 kb = sk.key_blocks[name]
-                box.prop(kb, "value", text=name, slider=True)
+                row = box.row(align=True)
+                row.label(text=name)
+                row.prop(kb, "value", text="Influence", slider=True)
+
+        controller_box = layout.box()
+        controller_box.label(text="Combined Morphs", icon='DRIVER')
+        for key, value in sorted(primary.items()):
+            if key.startswith("morph_gen_combined_"):
+                controller_box.prop(
+                    primary,
+                    '["%s"]' % key,
+                    text=key[len("morph_gen_combined_"):].replace("_", " ").title(),
+                    slider=True,
+                )
+
+class MORPHGEN_PT_properties(bpy.types.Panel):
+    bl_label = "Morph Gen"
+    bl_idname = "MORPHGEN_PT_properties"
+    bl_space_type = "PROPERTIES"
+    bl_region_type = "WINDOW"
+    bl_context = "DATA"
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        settings = getattr(scene, "morph_gen", None)
+        if settings is None:
+            layout.label(text="Morph Gen is not initialized")
+            return
+        layout.label(text="Open the 3D View sidebar (N) for the full studio")
+        layout.prop(settings, "target_object", text="Active Mesh")
+        layout.operator("morph_gen.pick_model", text="Use Selected Mesh", icon="EYEDROPPER")
 
 
-_classes = (MORPHGEN_PT_main,)
+_classes = (MORPHGEN_PT_main, MORPHGEN_PT_properties)
 
 
 def register():

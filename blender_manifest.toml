@@ -1,6 +1,6 @@
 schema_version = "1.0.0"
 id = "morph_gen"
-version = "1.0.0"
+version = "1.1.1"
 name = "Morph Gen"
 tagline = "Professional shape-key and facial morph generator"
 maintainer = "Malik"

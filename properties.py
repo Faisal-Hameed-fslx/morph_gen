@@ -1,4 +1,4 @@
-import bpy
+﻿import bpy
 import os
 
 
@@ -47,7 +47,7 @@ def _shape_key_items(self, context):
 
 
 def _version_items(self, context):
-    text = bpy.data.texts.get("CC_Character_Versions")
+    text = bpy.data.texts.get("Morph_Gen_Versions")
     items = [('NONE', 'No saved versions', '')]
     if text:
         try:
@@ -59,16 +59,16 @@ def _version_items(self, context):
     return items
 
 
-class CCCharSettings(bpy.types.PropertyGroup):
+class MorphGenSettings(bpy.types.PropertyGroup):
     base_root: bpy.props.StringProperty(
-        name="Base Root Folder",
-        description="Folder to scan for CC base FBX files",
+        name="Base Mesh Folder",
+        description="Folder to scan for base mesh files",
         subtype='DIR_PATH',
-        default="C:/Users/Malik/Downloads/CC Character Base",
+        default="C:/Users/Malik/Downloads/Morph Gen Base",
     )
     base_file: bpy.props.EnumProperty(
-        name="Base File",
-        description="Discovered CC base FBX file",
+        name="Base Mesh File",
+        description="Discovered base mesh file",
         items=_fbx_items,
     )
     target_mesh: bpy.props.EnumProperty(
@@ -108,11 +108,12 @@ class CCCharSettings(bpy.types.PropertyGroup):
         default=2.0,
         min=0.0,
         max=5.0,
+        options={'HIDDEN'},
     )
     face_match_bake: bpy.props.BoolProperty(
         name="Create Reusable Face Morph",
-        description="Bake the image match into a reusable shape key",
         default=True,
+        options={'HIDDEN'},
     )
     new_shape_key_name: bpy.props.StringProperty(
         name="New Shape Key Name",
@@ -134,16 +135,16 @@ class CCCharSettings(bpy.types.PropertyGroup):
     )
 
 
-_classes = (CCCharSettings,)
+_classes = (MorphGenSettings,)
 
 
 def register():
     for cls in _classes:
         bpy.utils.register_class(cls)
-    bpy.types.Scene.cc_char = bpy.props.PointerProperty(type=CCCharSettings)
+    bpy.types.Scene.morph_gen = bpy.props.PointerProperty(type=MorphGenSettings)
 
 
 def unregister():
-    del bpy.types.Scene.cc_char
+    del bpy.types.Scene.morph_gen
     for cls in reversed(_classes):
         bpy.utils.unregister_class(cls)

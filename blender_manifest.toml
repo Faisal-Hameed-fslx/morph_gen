@@ -1,0 +1,9 @@
+schema_version = "1.0.0"
+id = "morph_gen"
+version = "1.0.0"
+name = "Morph Gen"
+tagline = "Professional shape-key and facial morph generator"
+maintainer = "Malik"
+type = "add-on"
+blender_version_min = "3.6.0"
+license = ["SPDX:GPL-3.0-or-later"]

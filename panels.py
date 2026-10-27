@@ -1,4 +1,4 @@
-import bpy
+﻿import bpy
 
 from . import operators
 
@@ -7,63 +7,61 @@ def _target_mesh():
     return operators.get_target_mesh()
 
 
-class CCCHAR_PT_main(bpy.types.Panel):
-    bl_label = "CC Character"
-    bl_idname = "CCCHAR_PT_main"
+class MORPHGEN_PT_main(bpy.types.Panel):
+    bl_label = "Morph Gen | Shape Key Studio"
+    bl_idname = "MORPHGEN_PT_main"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = "CC Char"
+    bl_category = "Morph Gen"
 
     def draw(self, context):
         layout = self.layout
-        s = context.scene.cc_char
+        s = context.scene.morph_gen
 
-        layout.prop(s, "target_object")
-        layout.operator("cc_char.pick_model", icon='EYEDROPPER')
-        row = layout.row(align=True)
-        row.operator("cc_char.load_base", icon='FILEBROWSER')
-        row.operator("cc_char.face_detect", icon='IMAGE')
-        if not s.loaded_collection and not s.target_object:
-            layout.label(text="Select a model with shape keys")
+        model_box = layout.box()
+        model_box.label(text="Active Model", icon='MESH_DATA')
+        model_box.prop(s, "target_object", text="Mesh")
+        model_box.operator("morph_gen.pick_model", text="Use Selected Mesh", icon='EYEDROPPER')
+        primary = _target_mesh()
+        if primary is None or primary.data.shape_keys is None:
+            model_box.label(text="Select a mesh with shape keys", icon='INFO')
             return
 
-        row = layout.row(align=True)
-        row.operator("cc_char.reset", icon='LOOP_BACK')
-        row.operator("cc_char.randomize", icon='MOD_NOISE')
-        row.operator("cc_char.sync", icon='LINKED')
+        actions = layout.box()
+        actions.label(text="Shape Key Actions", icon='MODIFIER')
+        row = actions.row(align=True)
+        row.operator("morph_gen.reset", text="Reset", icon='LOOP_BACK')
+        row.operator("morph_gen.sync", text="Synchronize", icon='LINKED')
+        actions.operator("morph_gen.randomize", text="Generate Random Variation", icon='MOD_NOISE')
 
-        layout.prop(s, "random_seed")
-        layout.prop(s, "random_strength")
-        layout.prop(s, "face_match_strength")
-        layout.prop(s, "face_match_bake")
+        random_box = actions.box()
+        random_box.prop(s, "random_seed")
+        random_box.prop(s, "random_strength")
 
-        row = layout.row(align=True)
-        row.operator("cc_char.save_preset", icon='EXPORT')
-        row.operator("cc_char.load_preset", icon='IMPORT')
-        layout.operator("cc_char.export", icon='EXPORT')
+        presets = layout.box()
+        presets.label(text="Presets & Export", icon='FILE')
+        row = presets.row(align=True)
+        row.operator("morph_gen.save_preset", text="Save Preset", icon='EXPORT')
+        row.operator("morph_gen.load_preset", text="Load Preset", icon='IMPORT')
+        presets.operator("morph_gen.export", text="Export FBX", icon='EXPORT')
 
         version_box = layout.box()
-        version_box.label(text="Internal Recovery Versions")
+        version_box.label(text="Scene Checkpoints", icon='FILE_TICK')
         version_box.prop(s, "version_name")
-        version_box.operator("cc_char.save_version", icon='FILE_TICK')
+        version_box.operator("morph_gen.save_version", icon='FILE_TICK')
         version_box.prop(s, "saved_version")
         row = version_box.row(align=True)
-        row.operator("cc_char.restore_version", icon='LOOP_BACK')
-        row.operator("cc_char.delete_version", icon='TRASH')
+        row.operator("morph_gen.restore_version", icon='LOOP_BACK')
+        row.operator("morph_gen.delete_version", icon='TRASH')
 
         layout.prop(s, "filter_text", icon='VIEWZOOM')
 
-        # Manual morph library
         sk_box = layout.box()
-        sk_box.label(text="Manual Morph Library")
+        sk_box.label(text="Morph Library", icon='SHAPEKEY_DATA')
         sk_box.prop(s, "new_shape_key_name")
-        sk_box.operator("cc_char.add_shape_key", text="Create Morph From Current", icon='ADD')
+        sk_box.operator("morph_gen.add_shape_key", text="Create Morph From Current", icon='ADD')
         sk_box.prop(s, "shape_key_to_remove")
-        sk_box.operator("cc_char.remove_shape_key", text="Remove Selected Morph", icon='REMOVE')
-        primary = _target_mesh()
-        if primary is None or primary.data.shape_keys is None:
-            layout.label(text="No shape keys found")
-            return
+        sk_box.operator("morph_gen.remove_shape_key", text="Remove Selected Morph", icon='REMOVE')
         sk = primary.data.shape_keys
 
         groups = {}
@@ -84,7 +82,7 @@ class CCCHAR_PT_main(bpy.types.Panel):
                 box.prop(kb, "value", text=name, slider=True)
 
 
-_classes = (CCCHAR_PT_main,)
+_classes = (MORPHGEN_PT_main,)
 
 
 def register():

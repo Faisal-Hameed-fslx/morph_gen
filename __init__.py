@@ -1,10 +1,10 @@
-bl_info = {
-    "name": "CC Character Generator",
+﻿bl_info = {
+    "name": "Morph Gen",
     "author": "Malik",
     "version": (1, 0, 0),
     "blender": (3, 6, 0),
-    "location": "View3D > Sidebar > CC Char",
-    "description": "Generate characters from Character Creator base meshes using morph sliders",
+    "location": "View3D > Sidebar > Morph Gen",
+    "description": "Professional shape-key and facial morph generator",
     "warning": "",
     "doc_url": "",
     "category": "3D View",
@@ -31,3 +31,4 @@ def unregister():
 
 if __name__ == "__main__":
     register()
+

@@ -7,7 +7,7 @@ exporting facial morphs on Blender meshes with shape keys.
 
 1. Open **Edit > Preferences > Add-ons** in Blender.
 2. Click **Install...**.
-3. Select `cc_char_gen.zip`.
+3. Select `morph_gen.zip`.
 4. Enable the Morph Gen add-on.
 5. Open a 3D Viewport and press **N**.
 6. Open the **Morph Gen** tab.
@@ -18,14 +18,14 @@ Morph Gen does not require a folder scan when the model is already open:
 
 1. Select the mesh object in the 3D View.
 2. Ensure it has shape keys.
-3. Click **Pick Selected Model**.
+3. Click **Use Selected Mesh**.
 
 The add-on uses the selected mesh as the primary morph model and synchronizes
 matching shape-key values to other meshes in the same character collection.
 
 ## Create a reusable manual morph
 
-1. Select the model with **Pick Selected Model**.
+1. Select the model with **Use Selected Mesh**.
 2. Adjust the visible morph sliders.
 3. Enter a name in **New Shape Key Name**, such as `SoftEyes`.
 4. Click **Create Morph From Current**.
@@ -43,40 +43,6 @@ model. Save the character as an FBX when the morph is ready for export.
 - **Randomize Morphs** creates a quick randomized starting point.
 - **Sync Meshes** copies primary morph values to matching character meshes.
 
-## Image face matching
-
-**Match Face From Image** uses MediaPipe facial blendshapes to drive compatible
-expression shape keys. It can match expressions such as blinking, squinting,
-smiling, and jaw opening.
-
-Required files:
-
-- Python 3
-- `mediapipe`
-- `opencv-python`
-- `face_landmarker.task`
-
-The model file is searched for beside the add-on and at:
-
-```text
-C:\Users\Malik\Downloads\face_landmarker.task
-```
-
-Image matching is an expression helper, not full identity reconstruction. The
-result depends on the facial shape keys available on the selected mesh and may
-not reproduce exact face width, nose shape, jaw structure, or eye spacing from
-one image.
-
-## Optional FBX loading
-
-You can load a model through the add-on using:
-
-- **Load Selected Base**
-- **Auto-Find && Load First**
-- **Load Model (FBX)**
-
-For an already-open model, prefer **Pick Selected Model**.
-
 ## Compatibility and limitations
 
 - Blender 3.6 or newer is recommended.
@@ -87,7 +53,7 @@ For an already-open model, prefer **Pick Selected Model**.
 ## Files
 
 ```text
-cc_char_gen/
+morph_gen/
   __init__.py
   operators.py
   panels.py

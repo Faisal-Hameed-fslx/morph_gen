@@ -1,4 +1,4 @@
-import bpy
+﻿import bpy
 import json
 import random
 import os
@@ -14,7 +14,7 @@ from . import properties
 
 def _char_collection():
     scene = bpy.context.scene
-    name = scene.cc_char.loaded_collection
+    name = scene.morph_gen.loaded_collection
     if not name:
         return None
     return bpy.data.collections.get(name)
@@ -46,7 +46,7 @@ def get_meshes_with_shape_keys():
 
 def get_target_mesh():
     try:
-        s = bpy.context.scene.cc_char
+        s = bpy.context.scene.morph_gen
         if s.target_object and s.target_object.type == 'MESH' and s.target_object.data.shape_keys:
             return s.target_object
         name = s.target_mesh
@@ -146,7 +146,7 @@ def unregister_handlers():
 
 # ---------- Operators ----------
 
-_VERSION_TEXT = "CC_Character_Versions"
+_VERSION_TEXT = "Morph_Gen_Versions"
 
 
 def _version_data():
@@ -171,14 +171,14 @@ def _capture_version(context):
     scene = context.scene
     data = {
         "created": datetime.now().isoformat(timespec="seconds"),
-        "loaded_collection": scene.cc_char.loaded_collection,
-        "target_mesh": scene.cc_char.target_mesh,
-        "target_object": scene.cc_char.target_object.name if scene.cc_char.target_object else "",
+        "loaded_collection": scene.morph_gen.loaded_collection,
+        "target_mesh": scene.morph_gen.target_mesh,
+        "target_object": scene.morph_gen.target_object.name if scene.morph_gen.target_object else "",
         "settings": {
-            "filter_text": scene.cc_char.filter_text,
-            "random_seed": scene.cc_char.random_seed,
-            "random_strength": scene.cc_char.random_strength,
-            "face_match_strength": scene.cc_char.face_match_strength,
+            "filter_text": scene.morph_gen.filter_text,
+            "random_seed": scene.morph_gen.random_seed,
+            "random_strength": scene.morph_gen.random_strength,
+            "face_match_strength": scene.morph_gen.face_match_strength,
         },
         "objects": {},
     }
@@ -199,31 +199,31 @@ def _capture_version(context):
     return data
 
 
-class CCCHAR_OT_save_version(bpy.types.Operator):
-    bl_idname = "cc_char.save_version"
+class MORPHGEN_OT_save_version(bpy.types.Operator):
+    bl_idname = "morph_gen.save_version"
     bl_label = "Save Internal Version"
     bl_description = "Save a compact recovery checkpoint inside this blend file"
 
     def execute(self, context):
-        name = context.scene.cc_char.version_name.strip()
+        name = context.scene.morph_gen.version_name.strip()
         if not name:
             self.report({'WARNING'}, "Enter a version name")
             return {'CANCELLED'}
         versions = _version_data()
         versions[name] = _capture_version(context)
         _write_version_data(versions)
-        context.scene.cc_char.saved_version = name
+        context.scene.morph_gen.saved_version = name
         self.report({'INFO'}, "Saved internal version: %s" % name)
         return {'FINISHED'}
 
 
-class CCCHAR_OT_restore_version(bpy.types.Operator):
-    bl_idname = "cc_char.restore_version"
+class MORPHGEN_OT_restore_version(bpy.types.Operator):
+    bl_idname = "morph_gen.restore_version"
     bl_label = "Restore Internal Version"
     bl_description = "Restore morph values and scene state from a saved checkpoint"
 
     def execute(self, context):
-        name = context.scene.cc_char.saved_version
+        name = context.scene.morph_gen.saved_version
         version = _version_data().get(name)
         if not version:
             self.report({'WARNING'}, "Select a saved version first")
@@ -244,32 +244,32 @@ class CCCHAR_OT_restore_version(bpy.types.Operator):
                         key.value = value
         settings = version.get("settings", {})
         for key, value in settings.items():
-            setattr(context.scene.cc_char, key, value)
+            setattr(context.scene.morph_gen, key, value)
         _sync_meshes_to_primary()
         self.report({'INFO'}, "Restored internal version: %s" % name)
         return {'FINISHED'}
 
 
-class CCCHAR_OT_delete_version(bpy.types.Operator):
-    bl_idname = "cc_char.delete_version"
+class MORPHGEN_OT_delete_version(bpy.types.Operator):
+    bl_idname = "morph_gen.delete_version"
     bl_label = "Delete Internal Version"
     bl_description = "Delete the selected internal recovery checkpoint"
 
     def execute(self, context):
-        name = context.scene.cc_char.saved_version
+        name = context.scene.morph_gen.saved_version
         versions = _version_data()
         if name == 'NONE' or name not in versions:
             self.report({'WARNING'}, "Select a saved version first")
             return {'CANCELLED'}
         del versions[name]
         _write_version_data(versions)
-        context.scene.cc_char.saved_version = 'NONE'
+        context.scene.morph_gen.saved_version = 'NONE'
         self.report({'INFO'}, "Deleted internal version: %s" % name)
         return {'FINISHED'}
 
 
-class CCCHAR_OT_pick_model(bpy.types.Operator):
-    bl_idname = "cc_char.pick_model"
+class MORPHGEN_OT_pick_model(bpy.types.Operator):
+    bl_idname = "morph_gen.pick_model"
     bl_label = "Pick Selected Model"
     bl_description = "Use the selected shape-key mesh from the 3D View"
 
@@ -281,18 +281,18 @@ class CCCHAR_OT_pick_model(bpy.types.Operator):
         if obj is None or obj.data.shape_keys is None:
             self.report({'WARNING'}, "Select a mesh with shape keys in the 3D View")
             return {'CANCELLED'}
-        context.scene.cc_char.target_object = obj
+        context.scene.morph_gen.target_object = obj
         collections = list(obj.users_collection)
         if collections:
-            context.scene.cc_char.loaded_collection = collections[0].name
+            context.scene.morph_gen.loaded_collection = collections[0].name
         self.report({'INFO'}, "Using selected model: %s" % obj.name)
         return {'FINISHED'}
 
 
-class CCCHAR_OT_load_base(bpy.types.Operator, ImportHelper):
-    bl_idname = "cc_char.load_base"
-    bl_label = "Load CC Base (FBX)"
-    bl_description = "Import a Character Creator base FBX and set up morph sliders"
+class MORPHGEN_OT_load_base(bpy.types.Operator, ImportHelper):
+    bl_idname = "morph_gen.load_base"
+    bl_label = "Load Base Mesh"
+    bl_description = "Import a base mesh and set up morph sliders"
     filename_ext = ".fbx"
     filter_glob: StringProperty(default="*.fbx", options={'HIDDEN'})
 
@@ -308,7 +308,7 @@ class CCCHAR_OT_load_base(bpy.types.Operator, ImportHelper):
             self.report({'WARNING'}, "No objects imported")
             return {'CANCELLED'}
 
-        coll = bpy.data.collections.new("CC_Character")
+        coll = bpy.data.collections.new("Morph_Character")
         context.scene.collection.children.link(coll)
         for obj in imported:
             for c in list(obj.users_collection):
@@ -318,14 +318,14 @@ class CCCHAR_OT_load_base(bpy.types.Operator, ImportHelper):
                     pass
             coll.objects.link(obj)
 
-        context.scene.cc_char.loaded_collection = coll.name
+        context.scene.morph_gen.loaded_collection = coll.name
         _set_slider_ranges()
         self.report({'INFO'}, "Loaded %d objects" % len(imported))
         return {'FINISHED'}
 
 
-class CCCHAR_OT_reset(bpy.types.Operator):
-    bl_idname = "cc_char.reset"
+class MORPHGEN_OT_reset(bpy.types.Operator):
+    bl_idname = "morph_gen.reset"
     bl_label = "Reset Morphs"
     bl_description = "Reset all morph sliders to zero"
 
@@ -339,13 +339,13 @@ class CCCHAR_OT_reset(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class CCCHAR_OT_randomize(bpy.types.Operator):
-    bl_idname = "cc_char.randomize"
+class MORPHGEN_OT_randomize(bpy.types.Operator):
+    bl_idname = "morph_gen.randomize"
     bl_label = "Randomize Morphs"
     bl_description = "Randomize morph sliders"
 
     def execute(self, context):
-        s = context.scene.cc_char
+        s = context.scene.morph_gen
         random.seed(s.random_seed)
         strength = s.random_strength
         primary = get_target_mesh()
@@ -360,8 +360,8 @@ class CCCHAR_OT_randomize(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class CCCHAR_OT_sync(bpy.types.Operator):
-    bl_idname = "cc_char.sync"
+class MORPHGEN_OT_sync(bpy.types.Operator):
+    bl_idname = "morph_gen.sync"
     bl_label = "Sync Meshes"
     bl_description = "Copy morph values from the body mesh to all other meshes"
 
@@ -370,8 +370,8 @@ class CCCHAR_OT_sync(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class CCCHAR_OT_save_preset(bpy.types.Operator, ExportHelper):
-    bl_idname = "cc_char.save_preset"
+class MORPHGEN_OT_save_preset(bpy.types.Operator, ExportHelper):
+    bl_idname = "morph_gen.save_preset"
     bl_label = "Save Preset"
     filename_ext = ".json"
     filter_glob: StringProperty(default="*.json", options={'HIDDEN'})
@@ -395,8 +395,8 @@ class CCCHAR_OT_save_preset(bpy.types.Operator, ExportHelper):
         return {'FINISHED'}
 
 
-class CCCHAR_OT_load_preset(bpy.types.Operator, ImportHelper):
-    bl_idname = "cc_char.load_preset"
+class MORPHGEN_OT_load_preset(bpy.types.Operator, ImportHelper):
+    bl_idname = "morph_gen.load_preset"
     bl_label = "Load Preset"
     filename_ext = ".json"
     filter_glob: StringProperty(default="*.json", options={'HIDDEN'})
@@ -420,8 +420,8 @@ class CCCHAR_OT_load_preset(bpy.types.Operator, ImportHelper):
         return {'FINISHED'}
 
 
-class CCCHAR_OT_export(bpy.types.Operator, ExportHelper):
-    bl_idname = "cc_char.export"
+class MORPHGEN_OT_export(bpy.types.Operator, ExportHelper):
+    bl_idname = "morph_gen.export"
     bl_label = "Export Character (FBX)"
     filename_ext = ".fbx"
     filter_glob: StringProperty(default="*.fbx", options={'HIDDEN'})
@@ -448,13 +448,13 @@ class CCCHAR_OT_export(bpy.types.Operator, ExportHelper):
             self.report({'ERROR'}, "Export failed: %s" % e)
             return {'CANCELLED'}
         return {'FINISHED'}
-class CCCHAR_OT_add_shape_key(bpy.types.Operator):
-    bl_idname = "cc_char.add_shape_key"
+class MORPHGEN_OT_add_shape_key(bpy.types.Operator):
+    bl_idname = "morph_gen.add_shape_key"
     bl_label = "Add Shape Key (from current)"
     bl_description = "Create a new shape key from the current deformed mesh"
 
     def execute(self, context):
-        s = context.scene.cc_char
+        s = context.scene.morph_gen
         name = s.new_shape_key_name.strip() or "NewMorph"
         primary = get_target_mesh()
         if primary is None or primary.data.shape_keys is None:
@@ -475,13 +475,13 @@ class CCCHAR_OT_add_shape_key(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class CCCHAR_OT_remove_shape_key(bpy.types.Operator):
-    bl_idname = "cc_char.remove_shape_key"
+class MORPHGEN_OT_remove_shape_key(bpy.types.Operator):
+    bl_idname = "morph_gen.remove_shape_key"
     bl_label = "Remove Shape Key"
     bl_description = "Remove the selected shape key from target mesh"
 
     def execute(self, context):
-        s = context.scene.cc_char
+        s = context.scene.morph_gen
         name = s.shape_key_to_remove
         if not name or name == 'NONE':
             self.report({'WARNING'}, "No shape key selected")
@@ -497,13 +497,13 @@ class CCCHAR_OT_remove_shape_key(bpy.types.Operator):
         self.report({'INFO'}, "Removed: %s" % name)
         return {'FINISHED'}
 
-class CCCHAR_OT_load_selected(bpy.types.Operator):
-    bl_idname = "cc_char.load_selected"
+class MORPHGEN_OT_load_selected(bpy.types.Operator):
+    bl_idname = "morph_gen.load_selected"
     bl_label = "Load Selected Base"
     bl_description = "Load the base FBX chosen in the dropdown (auto-discovered from folder)"
 
     def execute(self, context):
-        s = context.scene.cc_char
+        s = context.scene.morph_gen
         path = s.base_file
         if not path or path == 'NONE':
             items = properties._fbx_items(s, context)
@@ -523,7 +523,7 @@ class CCCHAR_OT_load_selected(bpy.types.Operator):
             self.report({'WARNING'}, "No objects imported")
             return {'CANCELLED'}
 
-        coll = bpy.data.collections.new("CC_Character")
+        coll = bpy.data.collections.new("Morph_Character")
         context.scene.collection.children.link(coll)
         for obj in imported:
             for c in list(obj.users_collection):
@@ -533,31 +533,31 @@ class CCCHAR_OT_load_selected(bpy.types.Operator):
                     pass
             coll.objects.link(obj)
 
-        context.scene.cc_char.loaded_collection = coll.name
+        context.scene.morph_gen.loaded_collection = coll.name
         _set_slider_ranges()
         self.report({'INFO'}, "Loaded %d objects from %s" % (len(imported), path))
         return {'FINISHED'}
 
 
-class CCCHAR_OT_load_first_found(bpy.types.Operator):
-    bl_idname = "cc_char.load_first_found"
+class MORPHGEN_OT_load_first_found(bpy.types.Operator):
+    bl_idname = "morph_gen.load_first_found"
     bl_label = "Auto-Find && Load First"
-    bl_description = "Scan the folder and load the first CC base FBX found"
+    bl_description = "Scan the folder and load the first base mesh found"
 
     def execute(self, context):
-        s = context.scene.cc_char
+        s = context.scene.morph_gen
         items = properties._fbx_items(s, context)
         if not items or items[0][0] == 'NONE':
             self.report({'WARNING'}, "No FBX found in folder")
             return {'CANCELLED'}
         s.base_file = items[0][0]
-        return bpy.ops.cc_char.load_selected()
+        return bpy.ops.morph_gen.load_selected()
 
 
-class CCCHAR_OT_face_detect(bpy.types.Operator, ImportHelper):
-    bl_idname = "cc_char.face_detect"
-    bl_label = "Match Face From Image"
-    bl_description = "Detect a face and apply matching facial morphs from an image"
+class MORPHGEN_OT_face_detect(bpy.types.Operator, ImportHelper):
+    bl_idname = "morph_gen.face_detect"
+    bl_label = "Match Front Image"
+    bl_description = "Detect a front-facing image and apply matching facial morphs"
     filename_ext = ".jpg"
     filter_glob: StringProperty(default="*.jpg;*.png;*.jpeg", options={'HIDDEN'})
 
@@ -568,36 +568,8 @@ class CCCHAR_OT_face_detect(bpy.types.Operator, ImportHelper):
             return {'CANCELLED'}
         primary = get_target_mesh()
         if primary is None or primary.data.shape_keys is None:
-            base_path = os.path.join(
-                context.scene.cc_char.base_root,
-                "FBX",
-                "02_Neutral_F",
-                "Neutral_F.Fbx",
-            )
-            if not os.path.isfile(base_path):
-                self.report({'WARNING'}, "Load a character with shape keys before matching a face")
-                return {'CANCELLED'}
-            try:
-                bpy.ops.import_scene.fbx(filepath=base_path)
-            except Exception as error:
-                self.report({'ERROR'}, "Automatic Neutral F import failed: %s" % error)
-                return {'CANCELLED'}
-            imported = list(context.selected_objects)
-            if not imported:
-                self.report({'ERROR'}, "Neutral F import returned no objects")
-                return {'CANCELLED'}
-            collection = bpy.data.collections.new("CC_Character")
-            context.scene.collection.children.link(collection)
-            for obj in imported:
-                for source_collection in list(obj.users_collection):
-                    source_collection.objects.unlink(obj)
-                collection.objects.link(obj)
-            context.scene.cc_char.loaded_collection = collection.name
-            _set_slider_ranges()
-            primary = get_target_mesh()
-            if primary is None or primary.data.shape_keys is None:
-                self.report({'ERROR'}, "Imported Neutral F has no usable shape keys")
-                return {'CANCELLED'}
+            self.report({'WARNING'}, "Load or select a base mesh with shape keys first")
+            return {'CANCELLED'}
 
         import subprocess
         import tempfile
@@ -700,7 +672,7 @@ print(json.dumps({"eye_dist":eye_dist,"nose_width":nose_width,"jaw_width":jaw_wi
         shape_keys = [kb for kb in primary.data.shape_keys.key_blocks if kb.name != 'Basis']
         blendshapes = data.get("blendshapes", {})
         applied = 0
-        strength = max(2.0, context.scene.cc_char.face_match_strength)
+        strength = max(2.0, context.scene.morph_gen.face_match_strength)
         for key_block in shape_keys:
             key_block.value = 0.0
         for key_block in shape_keys:
@@ -739,7 +711,7 @@ print(json.dumps({"eye_dist":eye_dist,"nose_width":nose_width,"jaw_width":jaw_wi
         empty.rotation_euler = (1.5708, 0, 0)
         bpy.context.scene.collection.objects.link(empty)
         baked = 0
-        if applied and context.scene.cc_char.face_match_bake:
+        if applied and context.scene.morph_gen.face_match_bake:
             morph_name = "FaceMatch_%s" % os.path.splitext(name)[0][:40]
             baked = _bake_face_match(morph_name)
         if applied == 0:
@@ -752,20 +724,20 @@ print(json.dumps({"eye_dist":eye_dist,"nose_width":nose_width,"jaw_width":jaw_wi
 
 
 _classes = (
-    CCCHAR_OT_save_version,
-    CCCHAR_OT_restore_version,
-    CCCHAR_OT_delete_version,
-    CCCHAR_OT_pick_model,
-    CCCHAR_OT_load_base,
-    CCCHAR_OT_reset,
-    CCCHAR_OT_randomize,
-    CCCHAR_OT_sync,
-    CCCHAR_OT_save_preset,
-    CCCHAR_OT_load_preset,
-    CCCHAR_OT_export,
-    CCCHAR_OT_load_selected,
-    CCCHAR_OT_load_first_found,
-    CCCHAR_OT_face_detect,
+    MORPHGEN_OT_save_version,
+    MORPHGEN_OT_restore_version,
+    MORPHGEN_OT_delete_version,
+    MORPHGEN_OT_pick_model,
+    MORPHGEN_OT_load_base,
+    MORPHGEN_OT_reset,
+    MORPHGEN_OT_randomize,
+    MORPHGEN_OT_sync,
+    MORPHGEN_OT_save_preset,
+    MORPHGEN_OT_load_preset,
+    MORPHGEN_OT_export,
+    MORPHGEN_OT_load_selected,
+    MORPHGEN_OT_load_first_found,
+    MORPHGEN_OT_face_detect,
 )
 
 
@@ -778,4 +750,4 @@ def unregister():
     for cls in reversed(_classes):
         bpy.utils.unregister_class(cls)
 
-_classes = _classes + (CCCHAR_OT_add_shape_key, CCCHAR_OT_remove_shape_key)
+_classes = _classes + (MORPHGEN_OT_add_shape_key, MORPHGEN_OT_remove_shape_key)
